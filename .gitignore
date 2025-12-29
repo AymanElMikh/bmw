@@ -1,0 +1,16 @@
+venv
+/venv/
+node_modules
+backend/venv
+/legal-billing-frontend/node_modules
+/dist
+/legal-billing-frontend/dist
+.env
+/.env
+/legal-billing-frontend/.env
+pycache__
+__pycache__/
+*.pyc
+.DS_Store
+.idea
+.vscode
