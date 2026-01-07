@@ -148,6 +148,7 @@ class JiraTicketBase(BaseModel):
     hours_worked: Decimal = Field(..., ge=0)
     labels: List[str] = Field(default_factory=list)
     assignee: Optional[str] = None
+    resolved_at: Optional[datetime] = None
 
     @field_validator('hours_worked')
     @classmethod
@@ -158,6 +159,7 @@ class JiraTicketBase(BaseModel):
 class JiraTicket(JiraTicketBase):
     clause_id: Optional[str] = None
     is_billable: bool = False
+    billable_amount: Optional[Decimal] = None
 
     @field_validator('is_billable')
     @classmethod

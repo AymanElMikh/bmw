@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, List, Optional
 import uuid
@@ -119,6 +119,7 @@ class MockDatabase:
                 hours_worked=Decimal("16.5"),
                 labels=["FLASH_001"],
                 assignee="john.doe@altran.com",
+                resolved_at=datetime.now(timezone.utc) - timedelta(days=10),
                 clause_id="FLASH_001",
                 is_billable=True
             ),
@@ -130,6 +131,7 @@ class MockDatabase:
                 hours_worked=Decimal("8.0"),
                 labels=["FLASH_002"],
                 assignee="john.doe@altran.com",
+                resolved_at=datetime.now(timezone.utc) - timedelta(days=8),
                 clause_id="FLASH_002",
                 is_billable=True
             ),
@@ -141,6 +143,7 @@ class MockDatabase:
                 hours_worked=Decimal("4.0"),
                 labels=["FLASH_003"],
                 assignee="jane.smith@altran.com",
+                resolved_at=datetime.now(timezone.utc) - timedelta(days=7),
                 clause_id="FLASH_003",
                 is_billable=True
             ),
@@ -152,6 +155,7 @@ class MockDatabase:
                 hours_worked=Decimal("6.5"),
                 labels=["FLASH_004"],
                 assignee="john.doe@altran.com",
+                resolved_at=datetime.now(timezone.utc) - timedelta(days=5),
                 clause_id="FLASH_004",
                 is_billable=True
             ),
@@ -163,6 +167,7 @@ class MockDatabase:
                 hours_worked=Decimal("12.0"),
                 labels=["FLASH_001"],
                 assignee="john.doe@altran.com",
+                resolved_at=None,
                 clause_id="FLASH_001",
                 is_billable=False
             ),
@@ -174,6 +179,7 @@ class MockDatabase:
                 hours_worked=Decimal("8.0"),
                 labels=[],  # No billable label
                 assignee="bob.wilson@altran.com",
+                resolved_at=datetime.now(timezone.utc) - timedelta(days=3),
                 clause_id=None,
                 is_billable=False
             ),

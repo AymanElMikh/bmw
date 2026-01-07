@@ -1,7 +1,8 @@
 from typing import List, Dict, Optional, Tuple
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
 import io
+import logging
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
@@ -15,19 +16,22 @@ from models import (
 )
 from database import db
 
+# Configure logging
+logger = logging.getLogger(__name__)
+
 
 # ============================================================================
 # JIRA INTEGRATION SERVICE
 # ============================================================================
 
 class JiraIntegrationService:
-    """Service for interacting with Jira API"""
+    """Service for interacting with Jira API and enriching tickets"""
     
     def __init__(self, api_endpoint: str, user_token: str):
         self.api_endpoint = api_endpoint
         self.user_token = user_token
     
-    async def fetch_tickets(
+    async def fetch_and_process_tickets(
         self,
         project_key: str,
         status_filter: Optional[TicketStatus] = None,
@@ -36,17 +40,93 @@ class JiraIntegrationService:
         end_date: Optional[datetime] = None
     ) -> List[JiraTicket]:
         """
-        Fetch tickets from Jira API
-        In this mock implementation, returns data from database
+        Fetch tickets from Jira API and enrich them with billing information
+        This is the SINGLE source of truth for fetching tickets
         """
-        # In production, this would make actual HTTP calls to Jira
-        # Example JQL query:
-        # jql = f"project={project_key} AND status={status_filter}"
-        # if label_filter:
-        #     jql += f" AND labels={label_filter}"
-        
+        # Step 1: Fetch raw tickets from database (in production, from Jira API)
         tickets = db.get_jira_tickets(status=status_filter, label=label_filter)
-        return tickets
+        
+        # Step 2: Filter by date range if provided
+        if start_date or end_date:
+            tickets = self._filter_by_date_range(tickets, start_date, end_date)
+        
+        # Step 3: Enrich each ticket with billing information
+        enriched_tickets = []
+        for ticket in tickets:
+            enriched_ticket = self._enrich_ticket_with_billing(ticket)
+            enriched_tickets.append(enriched_ticket)
+        
+        return enriched_tickets
+    
+    def _normalize_datetime(self, dt: Optional[datetime]) -> Optional[datetime]:
+        """
+        Normalize datetime to be timezone-aware (UTC)
+        If datetime is naive, assume it's UTC
+        """
+        if dt is None:
+            return None
+        
+        if dt.tzinfo is None:
+            # Naive datetime - assume UTC
+            return dt.replace(tzinfo=timezone.utc)
+        else:
+            # Already timezone-aware - convert to UTC
+            return dt.astimezone(timezone.utc)
+    
+    def _filter_by_date_range(
+        self,
+        tickets: List[JiraTicket],
+        start_date: Optional[datetime],
+        end_date: Optional[datetime]
+    ) -> List[JiraTicket]:
+        """Filter tickets by date range"""
+        filtered = tickets
+        
+        # Normalize input dates to UTC
+        start_date_utc = self._normalize_datetime(start_date)
+        end_date_utc = self._normalize_datetime(end_date)
+        
+        if start_date_utc:
+            filtered = [
+                t for t in filtered 
+                if t.resolved_at and self._normalize_datetime(t.resolved_at) >= start_date_utc
+            ]
+        
+        if end_date_utc:
+            filtered = [
+                t for t in filtered 
+                if t.resolved_at and self._normalize_datetime(t.resolved_at) <= end_date_utc
+            ]
+        
+        return filtered
+    
+    def _enrich_ticket_with_billing(self, ticket: JiraTicket) -> JiraTicket:
+        """
+        Enrich a single ticket with billing information
+        This modifies the ticket object in place
+        """
+        # Match ticket to clause
+        clause = MappingEngine.match_ticket_to_clause(ticket)
+        
+        if clause:
+            # Calculate billable amount
+            billable_amount = MappingEngine.calculate_line_cost(ticket, clause)
+            
+            # Update ticket with billing info
+            ticket.clause_id = clause.clause_id
+            ticket.billable_amount = billable_amount
+            ticket.is_billable = True
+            
+            print(f"Enriched Ticket {ticket.ticket_id}: Clause={clause.clause_id}, Amount={billable_amount}")
+        else:
+            # No matching clause found
+            ticket.clause_id = None
+            ticket.billable_amount = Decimal("0.00")
+            ticket.is_billable = False
+            
+            print(f"Ticket {ticket.ticket_id}: No matching clause found")
+        
+        return ticket
     
     async def authenticate(self) -> bool:
         """Validate Jira token"""
@@ -65,7 +145,7 @@ class MappingEngine:
     def match_ticket_to_clause(ticket: JiraTicket) -> Optional[LegalClause]:
         """
         Match a Jira ticket to a legal clause based on labels
-        Returns the first matching clause or None
+        Returns the first matching active clause or None
         """
         if not ticket.labels:
             return None
@@ -81,7 +161,11 @@ class MappingEngine:
     @staticmethod
     def calculate_line_cost(ticket: JiraTicket, clause: LegalClause) -> Decimal:
         """Calculate the cost for a ticket based on hours and clause price"""
-        return round(ticket.hours_worked * clause.unit_price, 2)
+        if not ticket.hours_worked or not clause.unit_price:
+            return Decimal("0.00")
+        
+        cost = ticket.hours_worked * clause.unit_price
+        return round(cost, 2)
     
     @staticmethod
     def validate_mapping(ticket: JiraTicket) -> Tuple[bool, str]:
@@ -95,7 +179,7 @@ class MappingEngine:
         if not ticket.labels:
             return False, f"Ticket {ticket.ticket_id} has no labels"
         
-        if ticket.hours_worked <= 0:
+        if not ticket.hours_worked or ticket.hours_worked <= 0:
             return False, f"Ticket {ticket.ticket_id} has no hours logged"
         
         # Check if any label matches a clause
@@ -109,6 +193,7 @@ class MappingEngine:
     def process_tickets_batch(tickets: List[JiraTicket]) -> Dict:
         """
         Process multiple tickets and return mapping results
+        Assumes tickets are already enriched with billing info
         """
         results = {
             "valid": [],
@@ -120,21 +205,20 @@ class MappingEngine:
         for ticket in tickets:
             is_valid, error = MappingEngine.validate_mapping(ticket)
             
-            if is_valid:
-                clause = MappingEngine.match_ticket_to_clause(ticket)
-                cost = MappingEngine.calculate_line_cost(ticket, clause)
+            if is_valid and ticket.is_billable:
+                clause = db.get_clause(ticket.clause_id)
                 
                 results["valid"].append({
                     "ticket": ticket,
                     "clause": clause,
-                    "cost": cost
+                    "cost": ticket.billable_amount
                 })
-                results["total_cost"] += cost
+                results["total_cost"] += ticket.billable_amount
                 results["total_hours"] += ticket.hours_worked
             else:
                 results["invalid"].append({
                     "ticket": ticket,
-                    "error": error
+                    "error": error if error else "Not billable"
                 })
         
         return results
@@ -154,22 +238,37 @@ class InvoiceGenerator:
         tickets: List[JiraTicket],
         created_by: str
     ) -> Invoice:
-        """Generate an invoice from a list of tickets"""
+        """
+        Generate an invoice from a list of enriched tickets
+        Tickets must already be enriched with billing information
+        """
+        logger.info(f"=== InvoiceGenerator.generate_from_tickets ===")
+        logger.info(f"Input: {len(tickets)} tickets")
         
-        # Process tickets
+        # Process tickets to validate and aggregate
         mapping_results = MappingEngine.process_tickets_batch(tickets)
         
+        logger.info(f"Mapping results: {len(mapping_results['valid'])} valid, {len(mapping_results['invalid'])} invalid")
+        
         if not mapping_results["valid"]:
+            logger.error("No valid billable tickets after processing!")
+            for invalid in mapping_results["invalid"]:
+                logger.error(f"  Invalid: {invalid['ticket'].ticket_id} - {invalid['error']}")
             raise ValueError("No valid billable tickets found")
         
-        # Create invoice lines
+        # Create invoice lines from valid tickets
         lines = []
         for item in mapping_results["valid"]:
+            ticket = item["ticket"]
+            clause = item["clause"]
+            
+            logger.info(f"Creating line for {ticket.ticket_id}: {ticket.hours_worked}h × €{clause.unit_price} = €{item['cost']}")
+            
             line_data = {
-                "jira_ticket_id": item["ticket"].ticket_id,
-                "clause_id": item["clause"].clause_id,
-                "hours_worked": item["ticket"].hours_worked,
-                "unit_price": item["clause"].unit_price
+                "jira_ticket_id": ticket.ticket_id,
+                "clause_id": ticket.clause_id,
+                "hours_worked": ticket.hours_worked,
+                "unit_price": clause.unit_price
             }
             lines.append(line_data)
         
@@ -181,11 +280,15 @@ class InvoiceGenerator:
             "currency": Currency.EUR
         }
         
+        logger.info(f"Creating invoice with total: €{mapping_results['total_cost']}")
+        
         invoice = db.create_invoice(
             invoice_data=invoice_data,
             lines=lines,
             created_by=created_by
         )
+        
+        logger.info(f"Invoice created: {invoice.invoice_id}")
         
         return invoice
     
