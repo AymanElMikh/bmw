@@ -6,7 +6,7 @@ from datetime import datetime
 import logging
 from sqlalchemy.orm import Session
 
-from models import (
+from src.models import (
     User, UserCreate, UserUpdate,
     LegalClause, LegalClauseCreate, LegalClauseUpdate,
     JiraTicket, JiraFetchRequest, JiraFetchResponse,
@@ -16,14 +16,14 @@ from models import (
     UserRole, TicketStatus, InvoiceStatus, Currency,
     JiraTokenRequest
 )
-from database import (
+from src.database import (
     get_db, UserRepository, ClauseRepository, TicketRepository,
     InvoiceRepository, AuditRepository,
     UserRoleEnum, TicketStatusEnum, InvoiceStatusEnum, CurrencyEnum
 )
-from services.jira_integration import JiraIntegrationService
-from services.mapping_engine import MappingEngine
-from services.invoice_generator import InvoiceGenerator
+from src.services.jira_integration import JiraIntegrationService
+from src.services.mapping_engine import MappingEngine
+from src.services.invoice_generator import InvoiceGenerator
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -740,12 +740,12 @@ from contextlib import asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler for startup and shutdown"""
     # Startup
-    from database import init_db
+    from src.database import init_db
     init_db()
     logger.info("Database initialized")
-    
+     
     yield
-    
+     
     # Shutdown (if needed)
     logger.info("Application shutting down")
 

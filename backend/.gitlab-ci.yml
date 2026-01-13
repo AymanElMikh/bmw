@@ -1,0 +1,52 @@
+# This is a GitLab CI/CD configuration file that should run without any modifications.
+# It demonstrates the CI/CD pipeline needed for our AI projects.
+
+stages:
+  - lint
+  - test
+  - bump_version
+  - build
+  - deploy
+  - pages
+
+
+include:
+  - project: "a024100161549/ai-template/templates-ci"
+    file: "/ci-lint.yml"
+  - project: "a024100161549/ai-template/templates-ci"
+    file: "/ci-bump_version.yml"
+  - project: "a024100161549/ai-template/templates-ci"
+    file: "/ci-build_deploy.yml"
+  - project: "a024100161549/ai-template/templates-ci"
+    file: "/ci-pages-summary.yml"
+
+# Linting of python code
+# Rules: Executed on overy push to every branch, main
+lint_code:
+ extends: .lint_template
+ allow_failure: true
+ variables:
+   LINT_TARGETS: "src/"
+
+# Automatic version handling of a minor, minor or patch version. It also creates a tag of this version and updates the VERSION file in the repository
+# Rules: Executed on merge request or manual pipeline trigger
+# bump_version:
+#  extends: 
+#    - .bump_version_job_template
+#  variables:
+#    VERSION_BUMP: patch # increase major, minor, patch version (default=patch)
+
+# # Creates a docker image and deploy it directly to AZURE (acr) or GitLab (gcr) container registry.
+# # Rules: Executed on merge request or manual pipeline trigger
+# # Enable: If deployment is necessary
+# build_and_deploy_image:
+#   extends: 
+#     - .build_image_template
+#   variables:
+#    DEPLOY_TO: "acr"  # "acr=AZURE container registry", "gcr=GitLab container registry"
+
+# Creates a summary page of all the linting information (Deploy->Pages)
+# Rules: Executed on overy push to every branch, main
+pages:
+ extends: .pages_summary_template
+      

@@ -1,255 +1,104 @@
-# Legal Billing System - FastAPI Implementation
+# AI project template
 
-A complete FastAPI-based automated billing system for managing legal clause billing with Jira integration.
+This is a basic Python project that can be used as a starting point for any Data Science or AI projects.
 
-## 🏗️ Architecture
+‼️**DO NOT modify this `README.md` file. The project setup should be described in the [`PROJECT.md`](PROJECT.md) file**‼️
 
-This is a modular implementation with the following structure:
+The template includes:
+- [Project setup](PROJECT.md) ➡️ **Needs to be modifed by project team**
+- Project structure, defined by the repo
+- Docker-based development environment, described below
+- Development [Style Guide](GUIDE.md)
 
-```
-billing-system/
-├── main.py              # FastAPI application & endpoints
-├── models.py            # Pydantic schemas & data models
-├── database.py          # Mock database with sample data
-├── services.py          # Business logic services
-├── config.py            # Application configuration
-├── requirements.txt     # Python dependencies
-└── README.md           # This file
-```
 
-## 🚀 Quick Start
+## Project structure
 
-### 1. Install Dependencies
+### Directories
 
+* `data`: Data, including datasets for training and saved models. In most cases, the content of this directory should not be tracked by Git, except for small metadata files, like `.dvc` files, produced by [DVC](https://dvc.org/doc).
+* `src`: The project source code with [guardrails](https://github.com/guardrails-ai/guardrails).
+* `scripts`: Small standalone scripts and utils. This directory can also contain entry point scripts, such as code to start training a model.
+* `configs`: Configuration files: YAML, JSON, TOML, and etc.
+* `tests`: Various test files, such as unit tests for `pytest` and benchmark [deep-eval](https://github.com/confident-ai/deepeval)
+* `docs`: Detailed documentation of the project, for example, as a collection of `.md` files with relevant images.
+* `notebooks`: Jupyter notebooks for data exploration and visualisation.
+
+### Files
+
+* [`Project documentation`](PROJECT.md): The main documentation describing the project setup. ➡️ **Needs to be filled with content by the project team!!**
+* [`Style Guide`](GUIDE.md): The main readme describing basic principles and style guides to follow during the development
+* `Makefile`: A makefile for automating environment build and run processes. It may contain additional targets, like running tests, or generating documentation.
+* `Dockerfile`: Defines the project environment.
+* `requirements.txt`: A text file listing required Python packages with versions.
+* `.dockerignore`: A file specifying files and directories to exclude when building a Docker image.
+* `pyproject.toml`: The project configuration file defines metadata and other project-specific configurations.
+* `.gitignore`: A file listing files and directories that Git should not track.
+* `.pre-commit-config.yaml`: Configuration file for the pre-commit.
+
+## Environment setup
+
+The project uses [Docker](https://docs.docker.com/) to provide a reproducible environment for running
+the code. The environment is controlled by [Makefile](Makefile), which can be customized
+for the project needs.
+
+The provided Docker environment is a basic Python 3.11 image, but it can be
+configured by editing [Dockerfile](Dockerfile) to include any additional Linux
+packages required for the project. Alternatively, one can use different base
+Docker images, for example [nvidia/cuda](https://hub.docker.com/r/nvidia/cuda/#!).
+Configure [requirements.txt](requirements.txt) to include any additional python
+packages.
+
+To build the environment, run in the project home directory:
 ```bash
-# Create virtual environment
-python -m venv venv
-
-# Activate virtual environment
-# On Windows:
-venv\Scripts\activate
-# On Linux/Mac:
-source venv/bin/activate
-
-# Install requirements
-pip install -r requirements.txt
+make build
 ```
 
-### 2. Run the Application
-
+Once the image is built, start the container with:
 ```bash
-# Development mode with auto-reload
-python main.py
-
-# Or using uvicorn directly
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+make run
 ```
 
-### 3. Access the API
+The container has the project root directory mounted to `/workdir`,
+so all the local files can be accessed in the directory from within the container. Files saved
+inside `/workdir` will be saved in the project root directory of the host machine.
 
-- **API Documentation (Swagger UI)**: http://localhost:8000/api/docs
-- **Alternative Documentation (ReDoc)**: http://localhost:8000/api/redoc
-- **Health Check**: http://localhost:8000/health
+It is a good practice to develop inside the container with one's favorite IDE
+(e.g., VS Code or PyCharm) and execute the code from within the container.
 
-## 📚 API Endpoints
+Note: the template is meant to be used as a development environment and for
+running the code in experimental setups. Production scenarios may require further modifications
+to suit one's needs, including security features.
 
-### Authentication & Users
+### Environment variables
 
-- `GET /api/users/me` - Get current user info
-- `GET /api/users` - List all users (Admin only)
-- `POST /api/users` - Create new user (Admin only)
-- `PUT /api/users/jira-token` - Update Jira PAT
+In order to provide environment variables, such as secrets, it is a common practice to define them in the `.env` file and adding the file to the Docker run command in a Makefile with `--env-file=.env`. A sample structure of the `.env` file can be provided in the `.env.sample` file to make it easier for the user to fill with required values.
 
-### Legal Clauses
+### X11 support
 
-- `GET /api/clauses` - List all legal clauses
-- `GET /api/clauses/{clause_id}` - Get specific clause
-- `POST /api/clauses` - Create new clause (Admin only)
-- `PUT /api/clauses/{clause_id}` - Update clause (Admin only)
+In order to run the code in a container with X11 support, for example, to enable interactive visualisation, the Docker run command in the Makefile should include the following lines:
 
-### Jira Integration
-
-- `POST /api/jira/fetch` - Fetch tickets from Jira
-- `GET /api/jira/tickets` - List tickets with filters
-
-### Invoices
-
-- `GET /api/invoices` - List all invoices
-- `GET /api/invoices/{invoice_id}` - Get invoice details
-- `POST /api/invoices/generate` - Generate new invoice
-- `PATCH /api/invoices/{invoice_id}/status` - Update invoice status
-
-### Audit Logs
-
-- `GET /api/audit-logs` - Get audit trail (Admin only)
-
-## 🧪 Mock Data
-
-The system comes pre-loaded with mock data:
-
-### Users
-- **John Doe** (PROJECT_LEADER) - `user_001`
-- **Jane Smith** (ADMIN) - `user_002`
-- **Bob Wilson** (VIEWER) - `user_003`
-
-### Legal Clauses
-- **FLASH_001**: Standard Development - €85.00/hour
-- **FLASH_002**: Bug Fixing - €95.00/hour
-- **FLASH_003**: Code Review - €75.00/hour
-- **FLASH_004**: Technical Documentation - €70.00/hour
-
-### Jira Tickets
-- 6 sample tickets with various statuses
-- Some billable, some not billable
-
-### Sample Invoice
-- Pre-generated invoice for December 2024
-- Status: DRAFT
-- Total: €2,462.50
-
-## 🔧 Configuration
-
-Edit `config.py` or create a `.env` file:
-
-```env
-# Application
-DEBUG=True
-SECRET_KEY=your-secret-key-here
-
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/billing_db
-
-# Jira
-JIRA_API_ENDPOINT=https://jira.bmw.com/rest/api/2
-
-# SSO
-SSO_ENABLED=True
-SSO_PROVIDER=microsoft
+```
+        -v /tmp/.X11-unix:/tmp/.X11-unix \
+        -v $(HOME)/.Xauthority:/root/.Xauthority:rw \
+        -e DISPLAY=$(DISPLAY)
 ```
 
-## 📝 Example Usage
+This allows use of the Linux host X11 server to access the display. Note that other host types may require a different approach.
 
-### 1. List Legal Clauses
+## Pre-commit hooks
 
+The project provides some basic pre-commit hooks, helping with code linting before committing. It is just a helper, but even without this feature, it is important to ensure that the final code is formatted correctly, follows PEP8, and adheres to the development [Style Guide](GUIDE.md).
+
+To install pre-commit hooks, run in the project home directory:
 ```bash
-curl -X GET "http://localhost:8000/api/clauses" \
-  -H "accept: application/json"
+pip install pre-commit
+pre-commit install
+pre-commit install-hooks
 ```
 
-### 2. Fetch Jira Tickets
+The pre-commit hooks are defined in [.pre-commit-config.yaml](.pre-commit-config.yaml) and configured in [pyproject.toml](pyproject.toml). Feel free to customize them as needed.
 
-```bash
-curl -X POST "http://localhost:8000/api/jira/fetch" \
-  -H "accept: application/json" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "project_key": "BMW",
-    "billing_period_start": "2024-12-01T00:00:00Z",
-    "billing_period_end": "2024-12-31T23:59:59Z",
-    "status_filter": "CLOSED"
-  }'
-```
+The default provided hooks include isort for sorting imports and Ruff for linting. If preferred, other hooks can be installed. If desired, [Ruff Formatter](https://docs.astral.sh/ruff/formatter/) can be enabled by uncommeting the corresponding block in the `.pre-commit-config.yaml` file.
 
-### 3. Generate Invoice
+## Links
 
-```bash
-curl -X POST "http://localhost:8000/api/invoices/generate" \
-  -H "accept: application/json" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "project_name": "BMW FLASH Project",
-    "billing_period": "2024-12",
-    "jira_project_key": "BMW",
-    "billing_period_start": "2024-12-01T00:00:00Z",
-    "billing_period_end": "2024-12-31T23:59:59Z"
-  }'
-```
-
-## 🏛️ Architecture Layers
-
-### 1. **Models Layer** (`models.py`)
-- Pydantic schemas for request/response validation
-- Type safety and automatic documentation
-- Business rules enforcement
-
-### 2. **Database Layer** (`database.py`)
-- Mock database for POC
-- In production: Replace with SQLAlchemy ORM
-- CRUD operations for all entities
-
-### 3. **Services Layer** (`services.py`)
-- **JiraIntegrationService**: Handles Jira API calls
-- **MappingEngine**: Maps tickets to clauses
-- **InvoiceGenerator**: Creates and exports invoices
-- **AnalyticsService**: Generates reports
-
-### 4. **API Layer** (`main.py`)
-- FastAPI endpoints
-- Authentication & authorization
-- Error handling
-- Request/response validation
-
-## 🔐 Security Features
-
-- **Authentication**: Mock authentication (ready for JWT/OAuth2)
-- **Role-Based Access Control**: Admin, Project Leader, Viewer
-- **Token Encryption**: Jira PATs stored encrypted
-- **Audit Logging**: All actions tracked
-- **Input Validation**: Pydantic models validate all inputs
-
-## 📊 Export Formats
-
-The system supports multiple export formats:
-
-1. **PDF**: Professional invoice layout
-2. **Excel**: BMW SAP-compatible format
-3. **SAP XML**: Direct SAP integration format
-
-## 🎯 Key Features
-
-✅ Modular, clean architecture  
-✅ Type-safe with Pydantic  
-✅ Auto-generated API documentation  
-✅ Mock data for testing  
-✅ Role-based access control  
-✅ Comprehensive audit logging  
-✅ Multiple export formats  
-✅ Error handling & validation  
-
-## 🚧 Production Readiness
-
-To make this production-ready, implement:
-
-1. **Real Database**: Replace mock DB with PostgreSQL + SQLAlchemy
-2. **Authentication**: Implement JWT tokens with Microsoft Entra ID/Okta
-3. **Real Jira Integration**: Actual HTTP calls to Jira API
-4. **File Storage**: S3/Azure Blob for invoice PDFs
-5. **Email Notifications**: Send invoices via SMTP
-6. **Rate Limiting**: Prevent API abuse
-7. **Monitoring**: Add logging, metrics, and alerts
-8. **Tests**: Unit and integration tests with pytest
-
-## 📖 API Documentation
-
-Once running, visit:
-- **Swagger UI**: http://localhost:8000/api/docs
-- **ReDoc**: http://localhost:8000/api/redoc
-
-Both provide interactive API documentation where you can test all endpoints.
-
-## 🤝 Contributing
-
-This is a POC implementation. For production deployment:
-1. Review security settings
-2. Implement proper authentication
-3. Add comprehensive error handling
-4. Write tests (pytest)
-5. Set up CI/CD pipeline
-
-## 📄 License
-
-Internal Altran/BMW Project - Confidential
-
----
-
-**Questions?** Check the API documentation at `/api/docs` or review the code comments in each module.

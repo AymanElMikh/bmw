@@ -1,21 +1,21 @@
 """
 Script to seed the database with initial data
-Run with: python -m database.seed
+Run with: python -m src.database.seed (from backend root)
 """
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import logging
 
-from .config import SessionLocal, init_db
-from .repositories import (
+from src.database import SessionLocal, init_db
+from src.database.repositories import (
     UserRepository,
     ClauseRepository,
     TicketRepository,
     InvoiceRepository,
     AuditRepository
 )
-from .models import UserRoleEnum, TicketStatusEnum, InvoiceStatusEnum, CurrencyEnum
+from src.database.models import UserRoleEnum, TicketStatusEnum, InvoiceStatusEnum, CurrencyEnum
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
