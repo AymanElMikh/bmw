@@ -2,7 +2,7 @@ from typing import Optional, Dict
 from decimal import Decimal
 from sqlalchemy.orm import Session
 
-from src.database import InvoiceRepository, ClauseRepository
+from database import InvoiceRepository, ClauseRepository
 
 
 class AnalyticsService:

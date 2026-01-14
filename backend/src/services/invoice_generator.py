@@ -10,9 +10,9 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 
-from src.models import JiraTicket, Invoice, InvoiceLine, Currency
-from src.database import InvoiceRepository, ClauseRepository
-from src.database.models import CurrencyEnum, InvoiceStatusEnum
+from models import JiraTicket, Invoice, InvoiceLine, Currency
+from database import InvoiceRepository, ClauseRepository
+from database.models import CurrencyEnum, InvoiceStatusEnum
 from .mapping_engine import MappingEngine
 
 # Configure logging

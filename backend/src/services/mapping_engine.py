@@ -2,9 +2,9 @@ from typing import List, Optional, Tuple, Dict
 from decimal import Decimal
 from sqlalchemy.orm import Session
 
-from src.models import JiraTicket, TicketStatus
-from src.database import ClauseRepository
-from src.database.models import LegalClauseModel
+from models import JiraTicket, TicketStatus
+from database import ClauseRepository
+from database.models import LegalClauseModel
 
 
 class MappingEngine:

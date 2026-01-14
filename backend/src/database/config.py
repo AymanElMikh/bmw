@@ -5,7 +5,7 @@ from typing import Generator
 import os
 
 # Database configuration
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data/legal_billing.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/legal_billing.db")
 
 # Create engine
 engine = create_engine(
