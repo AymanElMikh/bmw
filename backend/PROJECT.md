@@ -50,7 +50,7 @@ This system automates the billing process for legal work tracked in Jira, mappin
 Start the development server:
 
 ```bash
-python main.py
+python src.main.py
 ```
 
 Access the application:
