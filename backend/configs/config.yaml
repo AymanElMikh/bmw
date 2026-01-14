@@ -5,36 +5,22 @@ application:
   version: "1.0.0"
   debug: true
 
-# Server Configuration
 server:
   host: "0.0.0.0"
   port: 8000
 
-# Security Configuration
 security:
-  secret_key: "your-secret-key-here-change-in-production"
   algorithm: "HS256"
-  access_token_expire_minutes: 1440  # 24 hours
+  access_token_expire_minutes: 1440
 
-# Database Configuration
-database:
-  url: "sqlite:///./data/legal_billing.db"
-
-# Jira Integration
 jira:
   api_endpoint: "https://jira.bmw.com/rest/api/2"
   timeout: 30
 
-# SSO Configuration
 sso:
   enabled: true
-  provider: "microsoft"  # "microsoft" or "okta"
-  microsoft:
-    tenant_id: null
-    client_id: null
-    client_secret: null
+  provider: "microsoft"
 
-# CORS Configuration
 cors:
   origins:
     - "http://localhost:3000"
@@ -42,26 +28,19 @@ cors:
     - "https://billing.altran.com"
     - "http://localhost:5173"
 
-# File Storage
 storage:
   upload_dir: "./uploads"
-  max_upload_size: 10485760  # 10MB in bytes
+  max_upload_size: 10485760
 
-# Invoice Settings
 invoice:
   default_currency: "EUR"
   prefix: "INV"
 
-# Email Configuration (for notifications)
 email:
   smtp:
-    host: null
     port: 587
-    user: null
-    password: null
   from: "noreply@altran.com"
 
-# Logging Configuration
 logging:
   level: "INFO"
   file: "logs/app.log"

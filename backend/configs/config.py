@@ -1,7 +1,9 @@
 import yaml
+import os
 from pathlib import Path
-from typing import Optional, Any
+from typing import Optional
 from pydantic import BaseModel, Field
+from pydantic_settings import BaseSettings
 
 
 class ApplicationConfig(BaseModel):
@@ -16,14 +18,22 @@ class ServerConfig(BaseModel):
     port: int = 8000
 
 
-class SecurityConfig(BaseModel):
-    secret_key: str = "your-secret-key-here-change-in-production"
+class SecurityConfig(BaseSettings):
+    secret_key: str = Field(default="change-me-in-production")
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 1440
 
+    class Config:
+        env_prefix = ""
+        case_sensitive = False
 
-class DatabaseConfig(BaseModel):
-    url: str = "sqlite:///./data/legal_billing.db"
+
+class DatabaseConfig(BaseSettings):
+    url: str = Field(default="sqlite:///./data/legal_billing.db")
+
+    class Config:
+        env_prefix = "DATABASE_"
+        case_sensitive = False
 
 
 class JiraConfig(BaseModel):
@@ -31,10 +41,14 @@ class JiraConfig(BaseModel):
     timeout: int = 30
 
 
-class MicrosoftSSOConfig(BaseModel):
-    tenant_id: Optional[str] = None
-    client_id: Optional[str] = None
-    client_secret: Optional[str] = None
+class MicrosoftSSOConfig(BaseSettings):
+    tenant_id: Optional[str] = Field(default=None)
+    client_id: Optional[str] = Field(default=None)
+    client_secret: Optional[str] = Field(default=None)
+
+    class Config:
+        env_prefix = "MICROSOFT_"
+        case_sensitive = False
 
 
 class SSOConfig(BaseModel):
@@ -62,11 +76,15 @@ class InvoiceConfig(BaseModel):
     prefix: str = "INV"
 
 
-class SMTPConfig(BaseModel):
-    host: Optional[str] = None
+class SMTPConfig(BaseSettings):
+    host: Optional[str] = Field(default=None)
     port: int = 587
-    user: Optional[str] = None
-    password: Optional[str] = None
+    user: Optional[str] = Field(default=None)
+    password: Optional[str] = Field(default=None)
+
+    class Config:
+        env_prefix = "SMTP_"
+        case_sensitive = False
 
 
 class EmailConfig(BaseModel):
@@ -83,7 +101,11 @@ class LoggingConfig(BaseModel):
 
 
 class Settings(BaseModel):
-    """Application configuration settings loaded from YAML"""
+    """
+    Application configuration settings.
+    - Structural config loaded from config.yaml
+    - Sensitive data loaded from .env file
+    """
     
     application: ApplicationConfig = Field(default_factory=ApplicationConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
@@ -98,69 +120,53 @@ class Settings(BaseModel):
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
     @classmethod
-    def load_from_yaml(cls, config_path: str = "config.yaml") -> "Settings":
-        """Load settings from YAML file"""
-        path = Path(config_path)
+    def load(cls, config_path: str = "config.yaml", env_file: str = ".env") -> "Settings":
+        """
+        Load settings from YAML (structural) and .env (secrets).
+        Priority: .env > config.yaml > defaults
+        """
+        # Load .env file if it exists
+        env_path = Path(env_file)
+        if env_path.exists():
+            from dotenv import load_dotenv
+            load_dotenv(env_path)
         
-        if not path.exists():
-            print(f"Warning: {config_path} not found, using default settings")
-            return cls()
+        # Load structural config from YAML
+        config_data = {}
+        yaml_path = Path(config_path)
+        if yaml_path.exists():
+            with open(yaml_path, 'r') as f:
+                config_data = yaml.safe_load(f) or {}
+        else:
+            print(f"Warning: {config_path} not found, using defaults")
         
-        with open(path, 'r') as f:
-            config_data = yaml.safe_load(f)
+        # Create base settings from YAML
+        settings = cls(**config_data)
         
-        return cls(**config_data)
-
-    @classmethod
-    def load_from_env_and_yaml(cls, config_path: str = "config.yaml") -> "Settings":
-        """Load settings from YAML and override with environment variables"""
-        import os
+        # Override sensitive fields from environment variables
+        # The BaseSettings subclasses will automatically read from env
+        settings.security = SecurityConfig()
+        settings.database = DatabaseConfig()
+        settings.sso.microsoft = MicrosoftSSOConfig()
+        settings.email.smtp = SMTPConfig()
         
-        # Load from YAML first
-        settings = cls.load_from_yaml(config_path)
-        
-        # Override with environment variables if they exist
-        # Database
-        if db_url := os.getenv("DATABASE_URL"):
-            settings.database.url = db_url
-        
-        # Security
-        if secret_key := os.getenv("SECRET_KEY"):
-            settings.security.secret_key = secret_key
-        
-        # SSO
-        if os.getenv("SSO_ENABLED") is not None:
-            settings.sso.enabled = os.getenv("SSO_ENABLED").lower() == "true"
-        if tenant_id := os.getenv("MICROSOFT_TENANT_ID"):
-            settings.sso.microsoft.tenant_id = tenant_id
-        if client_id := os.getenv("MICROSOFT_CLIENT_ID"):
-            settings.sso.microsoft.client_id = client_id
-        if client_secret := os.getenv("MICROSOFT_CLIENT_SECRET"):
-            settings.sso.microsoft.client_secret = client_secret
-        
-        # Email
-        if smtp_host := os.getenv("SMTP_HOST"):
-            settings.email.smtp.host = smtp_host
-        if smtp_user := os.getenv("SMTP_USER"):
-            settings.email.smtp.user = smtp_user
-        if smtp_password := os.getenv("SMTP_PASSWORD"):
-            settings.email.smtp.password = smtp_password
+        # Handle SSO_ENABLED from env
+        if sso_enabled := os.getenv("SSO_ENABLED"):
+            settings.sso.enabled = sso_enabled.lower() == "true"
         
         return settings
 
 
 # Create global settings instance
-settings = Settings.load_from_env_and_yaml()
+settings = Settings.load()
 
 
-# Convenience properties for backward compatibility
 class SettingsProxy:
     """Proxy to maintain backward compatibility with flat structure"""
     
     def __init__(self, settings: Settings):
         self._settings = settings
     
-    # Application
     @property
     def APP_NAME(self) -> str:
         return self._settings.application.name
@@ -173,7 +179,6 @@ class SettingsProxy:
     def DEBUG(self) -> bool:
         return self._settings.application.debug
     
-    # Server
     @property
     def HOST(self) -> str:
         return self._settings.server.host
@@ -182,7 +187,6 @@ class SettingsProxy:
     def PORT(self) -> int:
         return self._settings.server.port
     
-    # Security
     @property
     def SECRET_KEY(self) -> str:
         return self._settings.security.secret_key
@@ -195,12 +199,10 @@ class SettingsProxy:
     def ACCESS_TOKEN_EXPIRE_MINUTES(self) -> int:
         return self._settings.security.access_token_expire_minutes
     
-    # Database
     @property
     def DATABASE_URL(self) -> str:
         return self._settings.database.url
     
-    # Jira
     @property
     def JIRA_API_ENDPOINT(self) -> str:
         return self._settings.jira.api_endpoint
@@ -209,7 +211,6 @@ class SettingsProxy:
     def JIRA_TIMEOUT(self) -> int:
         return self._settings.jira.timeout
     
-    # SSO
     @property
     def SSO_ENABLED(self) -> bool:
         return self._settings.sso.enabled
@@ -230,12 +231,10 @@ class SettingsProxy:
     def MICROSOFT_CLIENT_SECRET(self) -> Optional[str]:
         return self._settings.sso.microsoft.client_secret
     
-    # CORS
     @property
     def CORS_ORIGINS(self) -> list:
         return self._settings.cors.origins
     
-    # Storage
     @property
     def UPLOAD_DIR(self) -> str:
         return self._settings.storage.upload_dir
@@ -244,7 +243,6 @@ class SettingsProxy:
     def MAX_UPLOAD_SIZE(self) -> int:
         return self._settings.storage.max_upload_size
     
-    # Invoice
     @property
     def DEFAULT_CURRENCY(self) -> str:
         return self._settings.invoice.default_currency
@@ -253,7 +251,6 @@ class SettingsProxy:
     def INVOICE_PREFIX(self) -> str:
         return self._settings.invoice.prefix
     
-    # Email
     @property
     def SMTP_HOST(self) -> Optional[str]:
         return self._settings.email.smtp.host
@@ -274,7 +271,6 @@ class SettingsProxy:
     def EMAIL_FROM(self) -> str:
         return self._settings.email.from_address
     
-    # Logging
     @property
     def LOG_LEVEL(self) -> str:
         return self._settings.logging.level
