@@ -5,6 +5,10 @@ from typing import List, Optional
 from datetime import datetime
 import logging
 from sqlalchemy.orm import Session
+from contextlib import asynccontextmanager
+
+# Import configuration
+from configs.config import settings, config
 
 from models import (
     User, UserCreate, UserUpdate,
@@ -25,8 +29,19 @@ from services.jira_integration import JiraIntegrationService
 from services.mapping_engine import MappingEngine
 from services.invoice_generator import InvoiceGenerator
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# ============================================================================
+# LOGGING CONFIGURATION
+# ============================================================================
+
+# Configure logging using settings from config
+logging.basicConfig(
+    level=getattr(logging, config.LOG_LEVEL),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(config.LOG_FILE),
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
 
 # ============================================================================
@@ -34,22 +49,27 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 app = FastAPI(
-    title="Legal Billing System API",
-    description="Automated billing system for Altran-BMW FLASH project",
-    version="1.0.0",
+    title=config.APP_NAME,
+    description=settings.application.description,
+    version=config.APP_VERSION,
     docs_url="/api/docs",
-    redoc_url="/api/redoc"
+    redoc_url="/api/redoc",
+    debug=config.DEBUG
 )
 
-# CORS Configuration
+# CORS Configuration using settings
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=config.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+logger.info(f"Starting {config.APP_NAME} v{config.APP_VERSION}")
+logger.info(f"Debug mode: {config.DEBUG}")
+logger.info(f"Database: {config.DATABASE_URL}")
+logger.info(f"CORS origins: {config.CORS_ORIGINS}")
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -168,9 +188,9 @@ async def get_admin_user(
 @app.get("/", tags=["Health"])
 async def root():
     return {
-        "service": "Legal Billing System API",
+        "service": config.APP_NAME,
         "status": "operational",
-        "version": "1.0.0",
+        "version": config.APP_VERSION,
         "timestamp": datetime.now().isoformat()
     }
 
@@ -400,9 +420,10 @@ async def fetch_jira_tickets(
         logger.info(f"Request params: project={request.project_key}, status={request.status_filter}, label={request.label_filter}")
         
         # Create service instance with database session
+        # Use Jira API endpoint from config
         token = "mock_token" if not current_user.has_jira_token else "mock_jira_token_for_" + current_user.user_id
         jira_service = JiraIntegrationService(
-            api_endpoint="https://jira.example.com",
+            api_endpoint=config.JIRA_API_ENDPOINT,
             user_token=token,
             db=db
         )
@@ -461,10 +482,10 @@ async def list_jira_tickets(
     List Jira tickets with optional filters
     Always returns enriched tickets with billing information
     """
-    # Create service instance (with or without token for mock)
+    # Create service instance using config
     token = "mock_token" if not current_user.has_jira_token else "mock_jira_token_for_" + current_user.user_id
     jira_service = JiraIntegrationService(
-        api_endpoint="https://jira.example.com",
+        api_endpoint=config.JIRA_API_ENDPOINT,
         user_token=token,
         db=db
     )
@@ -559,10 +580,10 @@ async def generate_invoice(
         
         logger.info(f"Date range: {start_date} to {end_date}")
         
-        # Create service instance with database session
+        # Create service instance with config
         token = "mock_token" if not current_user.has_jira_token else "mock_jira_token_for_" + current_user.user_id
         jira_service = JiraIntegrationService(
-            api_endpoint="https://jira.example.com",
+            api_endpoint=config.JIRA_API_ENDPOINT,
             user_token=token,
             db=db
         )
@@ -725,7 +746,7 @@ async def general_exception_handler(request, exc: Exception):
         content={
             "success": False,
             "error": "Internal server error",
-            "details": str(exc)
+            "details": str(exc) if config.DEBUG else "An error occurred"
         }
     )
 
@@ -734,20 +755,29 @@ async def general_exception_handler(request, exc: Exception):
 # LIFESPAN EVENT
 # ============================================================================
 
-from contextlib import asynccontextmanager
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan event handler for startup and shutdown"""
     # Startup
     from database import init_db
+    
+    # Ensure upload directory exists
+    import os
+    os.makedirs(config.UPLOAD_DIR, exist_ok=True)
+    os.makedirs(os.path.dirname(config.LOG_FILE), exist_ok=True)
+    
     init_db()
     logger.info("Database initialized")
-     
+    logger.info(f"Upload directory: {config.UPLOAD_DIR}")
+    logger.info(f"SSO enabled: {config.SSO_ENABLED}")
+    
     yield
-     
+    
     # Shutdown (if needed)
     logger.info("Application shutting down")
+
+
+app.router.lifespan_context = lifespan
 
 
 # ============================================================================
@@ -758,7 +788,7 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True
+        host=config.HOST,
+        port=config.PORT,
+        reload=config.DEBUG
     )

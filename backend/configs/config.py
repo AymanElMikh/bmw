@@ -120,7 +120,7 @@ class Settings(BaseModel):
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
     @classmethod
-    def load(cls, config_path: str = "config.yaml", env_file: str = ".env") -> "Settings":
+    def load(cls, config_path: str = ".config.yaml", env_file: str = ".env") -> "Settings":
         """
         Load settings from YAML (structural) and .env (secrets).
         Priority: .env > config.yaml > defaults

@@ -3,9 +3,9 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from sqlalchemy.orm import Session
 
-from models import JiraTicket, TicketStatus
-from database import TicketRepository, ClauseRepository
-from database.models import TicketStatusEnum
+from src.models import JiraTicket, TicketStatus
+from src.database import TicketRepository, ClauseRepository
+from src.database.models import TicketStatusEnum
 from .mapping_engine import MappingEngine
 
 

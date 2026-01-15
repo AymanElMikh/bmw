@@ -1,6 +1,7 @@
 from typing import List
 import io
 import logging
+import uuid
 from sqlalchemy.orm import Session
 
 from reportlab.lib.pagesizes import A4
@@ -10,9 +11,9 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 
-from models import JiraTicket, Invoice, InvoiceLine, Currency
-from database import InvoiceRepository, ClauseRepository
-from database.models import CurrencyEnum, InvoiceStatusEnum
+from src.models import JiraTicket, Invoice, InvoiceLine, Currency
+from src.database import InvoiceRepository, ClauseRepository
+from src.database.models import CurrencyEnum, InvoiceStatusEnum
 from .mapping_engine import MappingEngine
 
 # Configure logging
@@ -64,8 +65,12 @@ class InvoiceGenerator:
             }
             lines.append(line_data)
         
+        # Generate unique invoice ID
+        invoice_id = str(uuid.uuid4())
+
         # Create invoice
         invoice_data = {
+            "invoice_id": invoice_id,
             "project_name": project_name,
             "billing_period": billing_period,
             "total_amount": float(mapping_results["total_cost"]),
