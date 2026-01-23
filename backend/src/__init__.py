@@ -9,6 +9,8 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from datetime import datetime
 
 # Import configuration
@@ -123,7 +125,15 @@ def create_app() -> FastAPI:
     
     # Register routes
     register_routes(app)
-    
+
+    # Mount static files for frontend
+    app.mount("/", StaticFiles(directory="static", html=True), name="static")
+
+    # Catch-all handler for SPA
+    @app.get("/{path:path}")
+    async def serve_spa(path: str):
+        return FileResponse("static/index.html")
+
     # Health check endpoints
     @app.get("/", tags=["Health"])
     async def root():

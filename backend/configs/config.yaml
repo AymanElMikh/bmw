@@ -27,6 +27,7 @@ cors:
     - "http://localhost:8000"
     - "https://billing.altran.com"
     - "http://localhost:5173"
+    - "http://localhost:3001"
 
 storage:
   upload_dir: "./uploads"
